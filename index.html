@@ -1,14 +1,12 @@
 <!DOCTYPE html>
 <html lang="th">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
-<link rel="apple-touch-icon" href="icons/icon-192x192.png">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>สมุดคุมสต็อก</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --ink:#132A33;
@@ -222,9 +220,21 @@ tr:last-child td{border-bottom:none;}
 @media(max-width:600px){
   .masthead h1{font-size:26px;}
 }
+#printReport{ display:none; }
+#printReport table{ width:100%; border-collapse:collapse; font-size:11px; margin-bottom:22px; }
+#printReport th,#printReport td{ border:1px solid #999; padding:5px 7px; text-align:left; }
+#printReport th{ background:#eef5f6; }
+#printReport h1{ font-size:20px; margin:0 0 2px; font-family:var(--font-body); }
+#printReport h2{ font-size:15px; border-bottom:2px solid #132A33; padding-bottom:4px; margin-top:24px; font-family:var(--font-body); font-weight:600; }
+@media print{
+  body *{ visibility:hidden; }
+  #printReport, #printReport *{ visibility:visible; }
+  #printReport{ display:block !important; position:absolute; top:0; left:0; width:100%; padding:16px; }
+}
 </style>
 </head>
 <body>
+<div id="printReport"></div>
 <div class="app" id="app">
   <div class="loading" id="loading">กำลังโหลดข้อมูล…</div>
 </div>
@@ -496,6 +506,64 @@ async function handleImportBackup(evt){
   fileInput.value='';
 }
 
+function exportExcel(){
+  if(typeof XLSX === 'undefined'){
+    showToast('โหลดตัวช่วยส่งออก Excel ไม่สำเร็จ ลองเช็คอินเทอร์เน็ตแล้วรีเฟรชหน้าใหม่');
+    return;
+  }
+  const itemsRows = DATA.items.map(i=>({
+    'ชื่อสินค้า': i.name, 'SKU': i.sku||'', 'แบรนด์': i.category||'Hoymiles',
+    'คงเหลือ': i.qty, 'หน่วย': i.unit, 'จุดสั่งซื้อขั้นต่ำ': i.minStock,
+    'ต้นทุนต่อหน่วย': i.cost||0, 'มูลค่าสต็อก': i.qty*(i.cost||0)
+  }));
+  const txRows = [...DATA.transactions].sort((a,b)=>(a.date+a.id).localeCompare(b.date+b.id)).map(t=>{
+    const item = DATA.items.find(i=>i.id===t.itemId);
+    return {
+      'วันที่': t.date, 'สินค้า': item?item.name:'(ลบแล้ว)', 'แบรนด์': item?(item.category||'Hoymiles'):'-',
+      'ประเภท': t.type==='in'?'รับเข้า':'จ่ายออก', 'จำนวน': t.qty, 'หมายเหตุ': t.note||''
+    };
+  });
+  const serialRows = [...DATA.serials].sort((a,b)=>(a.saleDate+a.id).localeCompare(b.saleDate+b.id)).map(s=>{
+    const item = DATA.items.find(i=>i.id===s.itemId);
+    const st = warrantyStatus(s.warrantyExpiry);
+    return {
+      'Serial Number': s.serial, 'สินค้า': item?item.name:'(ลบแล้ว)', 'แบรนด์': item?(item.category||'Hoymiles'):'-',
+      'ลูกค้า': s.customer||'', 'จังหวัด': s.province||'', 'วันที่ขาย': s.saleDate,
+      'ระยะประกัน (ปี)': s.warrantyYears, 'วันหมดประกัน': s.warrantyExpiry, 'สถานะ': st.label, 'หมายเหตุ': s.note||''
+    };
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(itemsRows), 'สินค้า');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txRows), 'ประวัติเข้า-ออก');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(serialRows), 'ประกัน-Serial');
+  XLSX.writeFile(wb, 'inventory-export-' + todayStr() + '.xlsx');
+  showToast('ส่งออกไฟล์ Excel แล้ว');
+}
+
+function exportPDF(){
+  const itemsRows = DATA.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${esc(i.sku||'-')}</td><td>${esc(i.category||'Hoymiles')}</td><td>${i.qty} ${esc(i.unit)}</td><td>${i.minStock}</td><td>${fmtBaht(i.cost||0)}</td><td>${fmtBaht(i.qty*(i.cost||0))}</td></tr>`).join('');
+  const txRows = [...DATA.transactions].sort((a,b)=>(a.date+a.id).localeCompare(b.date+b.id)).map(t=>{
+    const item = DATA.items.find(i=>i.id===t.itemId);
+    return `<tr><td>${fmtDate(t.date)}</td><td>${esc(item?item.name:'(ลบแล้ว)')}</td><td>${esc(item?(item.category||'Hoymiles'):'-')}</td><td>${t.type==='in'?'รับเข้า':'จ่ายออก'}</td><td>${t.qty}</td><td>${esc(t.note||'-')}</td></tr>`;
+  }).join('');
+  const serialRows = [...DATA.serials].sort((a,b)=>(a.saleDate+a.id).localeCompare(b.saleDate+b.id)).map(s=>{
+    const item = DATA.items.find(i=>i.id===s.itemId);
+    const st = warrantyStatus(s.warrantyExpiry);
+    return `<tr><td>${esc(s.serial)}</td><td>${esc(item?item.name:'(ลบแล้ว)')}</td><td>${esc(s.customer||'-')}</td><td>${esc(s.province||'-')}</td><td>${fmtDate(s.saleDate)}</td><td>${s.warrantyYears} ปี</td><td>${fmtDate(s.warrantyExpiry)}</td><td>${st.label}</td></tr>`;
+  }).join('');
+  document.getElementById('printReport').innerHTML = `
+    <h1>รายงานข้อมูลสต็อกสินค้า</h1>
+    <div style="font-size:12px;color:#666;margin-bottom:8px;">Trinity Global Innovation Co., Ltd. — ข้อมูล ณ วันที่ ${fmtDate(todayStr())}</div>
+    <h2>รายการสินค้า (${DATA.items.length} รายการ)</h2>
+    <table><thead><tr><th>สินค้า</th><th>SKU</th><th>แบรนด์</th><th>คงเหลือ</th><th>ขั้นต่ำ</th><th>ต้นทุน/หน่วย</th><th>มูลค่าสต็อก</th></tr></thead><tbody>${itemsRows || '<tr><td colspan="7">ไม่มีข้อมูล</td></tr>'}</tbody></table>
+    <h2>ประวัติรับเข้า-จ่ายออก (${DATA.transactions.length} รายการ)</h2>
+    <table><thead><tr><th>วันที่</th><th>สินค้า</th><th>แบรนด์</th><th>ประเภท</th><th>จำนวน</th><th>หมายเหตุ</th></tr></thead><tbody>${txRows || '<tr><td colspan="6">ไม่มีข้อมูล</td></tr>'}</tbody></table>
+    <h2>ข้อมูล Serial / ประกันสินค้า (${DATA.serials.length} รายการ)</h2>
+    <table><thead><tr><th>Serial No.</th><th>สินค้า</th><th>ลูกค้า</th><th>จังหวัด</th><th>วันที่ขาย</th><th>ระยะประกัน</th><th>หมดประกัน</th><th>สถานะ</th></tr></thead><tbody>${serialRows || '<tr><td colspan="8">ไม่มีข้อมูล</td></tr>'}</tbody></table>
+  `;
+  setTimeout(()=>{ window.print(); }, 80);
+}
+
 function dashboardHTML(){
   const low = lowStockItems();
   const week = txInRange(7);
@@ -510,6 +578,12 @@ function dashboardHTML(){
       <button class="ghost small" onclick="exportBackup()">ดาวน์โหลดไฟล์สำรอง</button>
       ${unlocked ? `<button class="primary small" onclick="document.getElementById('importBackupFile').click()">กู้คืนข้อมูลจากไฟล์สำรอง</button>
       <input type="file" id="importBackupFile" accept=".json" style="display:none;" onchange="handleImportBackup(event)">` : ''}
+    </div>
+    <div class="section-head" style="margin-top:18px;"><h2 style="font-size:16px;">ดูข้อมูลดิบ</h2></div>
+    <div class="note">ส่งออกข้อมูลปัจจุบันทั้งหมดเป็นไฟล์ที่เปิดดูได้นอกแอป — Excel เหมาะกับการเปิดดู/กรอง/คำนวณต่อ ส่วน PDF เหมาะกับการพิมพ์หรือส่งให้คนอื่นดูแบบอ่านอย่างเดียว</div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+      <button class="ghost small" onclick="exportExcel()">ส่งออกเป็น Excel (.xlsx)</button>
+      <button class="ghost small" onclick="exportPDF()">ส่งออกเป็น PDF</button>
     </div>
   </div>`;
   html += `<div class="metrics">
