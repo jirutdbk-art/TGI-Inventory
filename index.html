@@ -339,7 +339,24 @@ tr:last-child td{border-bottom:none;}
 
 <div class="toast" id="toast"></div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC5vTpXKgd-T0wMQg6bqJAAFw4Kig-VlZI",
+  authDomain: "tgi-inventory-b7ece.firebaseapp.com",
+  projectId: "tgi-inventory-b7ece",
+  storageBucket: "tgi-inventory-b7ece.firebasestorage.app",
+  messagingSenderId: "593344534545",
+  appId: "1:593344534545:web:7f7db64346afd9f0e1f9b0",
+  measurementId: "G-32ZDDXV57P"
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const dataDocRef = doc(db, 'appdata', 'main');
+let firstSnapshotReceived = false;
+
 let DATA = { items: [], transactions: [], serials: [] };
 let currentTab = 'dashboard';
 let currentTxType = 'in';
@@ -394,19 +411,36 @@ function toggleUnlock(){
 
 async function loadData(){
   try{
-    const res = await window.storage.get('inventory-app-data', true);
-    if(res && res.value){ DATA = JSON.parse(res.value); }
+    onSnapshot(dataDocRef, (snap)=>{
+      if(snap.exists()){
+        const remote = snap.data();
+        DATA = {
+          items: Array.isArray(remote.items) ? remote.items : [],
+          transactions: Array.isArray(remote.transactions) ? remote.transactions : [],
+          serials: Array.isArray(remote.serials) ? remote.serials : []
+        };
+      }else{
+        DATA = { items: [], transactions: [], serials: [] };
+      }
+      firstSnapshotReceived = true;
+      render();
+    }, (err)=>{
+      console.error(err);
+      showToast('เชื่อมต่อฐานข้อมูลไม่สำเร็จ ตรวจสอบอินเทอร์เน็ต/การตั้งค่า Firebase');
+      if(!firstSnapshotReceived){ DATA = { items: [], transactions: [], serials: [] }; render(); }
+    });
   }catch(e){
+    console.error(e);
     DATA = { items: [], transactions: [], serials: [] };
+    render();
   }
-  if(!DATA.serials) DATA.serials = [];
-  render();
 }
 async function persist(){
   try{
-    await window.storage.set('inventory-app-data', JSON.stringify(DATA), true);
+    await setDoc(dataDocRef, DATA);
   }catch(e){
-    showToast('บันทึกข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง');
+    console.error(e);
+    showToast('บันทึกข้อมูลไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
   }
 }
 
@@ -1276,6 +1310,15 @@ async function saveTx(){
   render();
   showToast(currentTxType==='in' ? 'บันทึกรับเข้าแล้ว' : 'บันทึกจ่ายออกแล้ว');
 }
+
+Object.assign(window, {
+  switchTab, openItemModal, closeItemModal, saveItem, deleteItem,
+  openTxModal, closeTxModal, setTxType, saveTx,
+  openSerialModal, closeSerialModal, saveSerialEdit, deleteSerial,
+  toggleUnlock, handleImageSelect, removePendingImage,
+  exportBackup, handleImportBackup, exportExcel, exportPDF,
+  downloadCsvTemplate, handleImportSerials, copyReport
+});
 
 loadData();
 </script>
