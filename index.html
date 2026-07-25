@@ -975,44 +975,53 @@ async function handleImportSerials(evt){
       alert('ไฟล์ CSV ต้องมีคอลัมน์อย่างน้อย serial, item_name, sale_date (ดูตัวอย่างจากปุ่ม "ดาวน์โหลดเทมเพลต CSV")');
       fileInput.value=''; return;
     }
-    let added=0, skippedDup=0, skippedInvalid=0, matchedItems=0;
+    let skippedDup=0, skippedInvalid=0, matchedItems=0;
+    const newSerials = []; // เก็บพักไว้ก่อน ยังไม่แตะ DATA.serials จนกว่าทั้งไฟล์จะผ่านหมด
     const existingSerials = new Set(DATA.serials.map(s=>s.serial.toLowerCase()));
     rows.forEach(row=>{
-      const serial = (row.serial||'').trim();
-      const itemName = (row.item_name||'').trim();
-      const saleDate = (row.sale_date||'').trim();
-      let brand = (row.brand||'').trim();
-      let years = Number(row.warranty_years) || 1;
-      years = Math.min(15, Math.max(1, years));
-      const note = (row.note||'').trim();
-      const customer = (row.customer_name||'').trim();
-      const province = (row.province||'').trim();
-      if(!serial || !itemName || !/^\d{4}-\d{2}-\d{2}$/.test(saleDate)){ skippedInvalid++; return; }
-      if(existingSerials.has(serial.toLowerCase())){ skippedDup++; return; }
-      if(!GROUPS.includes(brand)) brand = '';
-      // ไม่สร้างสินค้าใหม่ในสต็อก — ถ้าชื่อตรงกับสินค้าที่มีอยู่แล้วเป๊ะๆ จะลิงก์ไว้เฉยๆ เพื่อความสะดวก แต่ถ้าไม่ตรงก็แค่เก็บชื่อไว้ในประวัติ ไม่ยุ่งกับรายการสต็อก
-      const matchedItem = DATA.items.find(i=> i.name.trim().toLowerCase()===itemName.toLowerCase());
-      if(matchedItem) matchedItems++;
-      const expiry = addYears(saleDate, years);
-      DATA.serials.push({
-        id:uid(), serial,
-        itemId: matchedItem ? matchedItem.id : null,
-        itemName: itemName,
-        brand: brand || (matchedItem ? (matchedItem.category||'Hoymiles') : 'Hoymiles'),
-        txId:null, saleDate, warrantyYears:years, warrantyExpiry:expiry, note, customer, province
-      });
-      existingSerials.add(serial.toLowerCase());
-      added++;
+      try{
+        const serial = (row.serial||'').trim();
+        const itemName = (row.item_name||'').trim();
+        const saleDate = (row.sale_date||'').trim();
+        let brand = (row.brand||'').trim();
+        let years = Number(row.warranty_years) || 1;
+        years = Math.min(15, Math.max(1, years));
+        const note = (row.note||'').trim();
+        const customer = (row.customer_name||'').trim();
+        const province = (row.province||'').trim();
+        const isRealDate = /^\d{4}-\d{2}-\d{2}$/.test(saleDate) && !isNaN(new Date(saleDate+'T00:00:00').getTime()) && new Date(saleDate+'T00:00:00').toISOString().slice(0,10)===saleDate;
+        if(!serial || !itemName || !isRealDate){ skippedInvalid++; return; }
+        if(existingSerials.has(serial.toLowerCase())){ skippedDup++; return; }
+        if(!GROUPS.includes(brand)) brand = '';
+        // ไม่สร้างสินค้าใหม่ในสต็อก — ถ้าชื่อตรงกับสินค้าที่มีอยู่แล้วเป๊ะๆ จะลิงก์ไว้เฉยๆ เพื่อความสะดวก แต่ถ้าไม่ตรงก็แค่เก็บชื่อไว้ในประวัติ ไม่ยุ่งกับรายการสต็อก
+        const matchedItem = DATA.items.find(i=> i.name.trim().toLowerCase()===itemName.toLowerCase());
+        if(matchedItem) matchedItems++;
+        const expiry = addYears(saleDate, years);
+        newSerials.push({
+          id:uid(), serial,
+          itemId: matchedItem ? matchedItem.id : null,
+          itemName: itemName,
+          brand: brand || (matchedItem ? (matchedItem.category||'Hoymiles') : 'Hoymiles'),
+          txId:null, saleDate, warrantyYears:years, warrantyExpiry:expiry, note, customer, province
+        });
+        existingSerials.add(serial.toLowerCase());
+      }catch(rowErr){
+        skippedInvalid++; // แถวนี้มีปัญหา ข้ามไปเฉยๆ ไม่ทำให้ทั้งไฟล์ล้ม
+      }
     });
-    await persist();
-    render();
-    let msg = `นำเข้าสำเร็จ ${added} รายการ (เป็นประวัติเก็บไว้เฉยๆ ไม่ได้เพิ่มลงรายการสต็อกสินค้า)`;
+    if(newSerials.length>0){
+      DATA.serials.push(...newSerials);
+      await persist();
+      render();
+    }
+    let msg = `นำเข้าสำเร็จ ${newSerials.length} รายการ (เป็นประวัติเก็บไว้เฉยๆ ไม่ได้เพิ่มลงรายการสต็อกสินค้า)`;
     if(matchedItems) msg += `\nในจำนวนนี้ ${matchedItems} รายการ ชื่อสินค้าตรงกับที่มีในสต็อกอยู่แล้ว จึงลิงก์ไว้ให้อัตโนมัติ`;
     if(skippedDup) msg += `\nข้าม (Serial ซ้ำ) ${skippedDup} รายการ`;
-    if(skippedInvalid) msg += `\nข้าม (ข้อมูลไม่ครบ/วันที่ผิดรูปแบบ) ${skippedInvalid} รายการ`;
+    if(skippedInvalid) msg += `\nข้าม (ข้อมูลไม่ครบ/วันที่ไม่ถูกต้อง เช่น รูปแบบผิดหรือวันที่ไม่มีจริง) ${skippedInvalid} รายการ`;
     alert(msg);
   }catch(e){
-    alert('ไม่สามารถอ่านไฟล์นี้ได้ กรุณาตรวจสอบว่าเป็นไฟล์ CSV ที่ถูกต้อง');
+    console.error(e);
+    alert('ไม่สามารถอ่านไฟล์นี้ได้ กรุณาตรวจสอบว่าเป็นไฟล์ CSV ที่ถูกต้อง (ไม่มีข้อมูลใดถูกบันทึกจากรอบนี้)');
   }
   fileInput.value='';
 }
