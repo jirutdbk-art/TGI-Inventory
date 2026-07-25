@@ -323,7 +323,20 @@ tr:last-child td{border-bottom:none;}
   <div class="modal">
     <h3>แก้ไขข้อมูลประกัน / Serial</h3>
     <input type="hidden" id="serialEditId">
-    <div class="field"><label>สินค้า</label><select id="serialItem"></select></div>
+    <div class="field">
+      <label>สินค้า</label>
+      <select id="serialItem" onchange="toggleSerialFreeName()">
+        <option value="">- ไม่ผูกกับสินค้าในสต็อก (ประวัติเก่าเท่านั้น) -</option>
+      </select>
+    </div>
+    <div id="serialFreeNameWrap" style="display:none;">
+      <div class="field-row">
+        <div class="field"><label>ชื่อสินค้า (พิมพ์เอง)</label><input id="serialFreeName" placeholder="เช่น Hoymiles HM-1500"></div>
+        <div class="field"><label>แบรนด์</label>
+          <select id="serialFreeBrand"><option value="Hoymiles">Hoymiles</option><option value="Huawei">Huawei</option></select>
+        </div>
+      </div>
+    </div>
     <div class="field"><label>Serial Number</label><input id="serialNumber" class="mono"></div>
     <div class="field-row">
       <div class="field"><label>วันที่ขาย</label><input id="serialSaleDate" type="date"></div>
@@ -562,10 +575,10 @@ function exportExcel(){
     };
   });
   const serialRows = [...DATA.serials].sort((a,b)=>(a.saleDate+a.id).localeCompare(b.saleDate+b.id)).map(s=>{
-    const item = DATA.items.find(i=>i.id===s.itemId);
+    const item = s.itemId ? DATA.items.find(i=>i.id===s.itemId) : null;
     const st = warrantyStatus(s.warrantyExpiry);
     return {
-      'Serial Number': s.serial, 'สินค้า': item?item.name:'(ลบแล้ว)', 'แบรนด์': item?(item.category||'Hoymiles'):'-',
+      'Serial Number': s.serial, 'สินค้า': item?item.name:(s.itemName||'-'), 'แบรนด์': item?(item.category||'Hoymiles'):(s.brand||'-'),
       'ลูกค้า': s.customer||'', 'จังหวัด': s.province||'', 'วันที่ขาย': s.saleDate,
       'ระยะประกัน (ปี)': s.warrantyYears, 'วันหมดประกัน': s.warrantyExpiry, 'สถานะ': st.label, 'หมายเหตุ': s.note||''
     };
@@ -585,9 +598,9 @@ function exportPDF(){
     return `<tr><td>${fmtDate(t.date)}</td><td>${esc(item?item.name:'(ลบแล้ว)')}</td><td>${esc(item?(item.category||'Hoymiles'):'-')}</td><td>${t.type==='in'?'รับเข้า':'จ่ายออก'}</td><td>${t.qty}</td><td>${esc(t.note||'-')}</td></tr>`;
   }).join('');
   const serialRows = [...DATA.serials].sort((a,b)=>(a.saleDate+a.id).localeCompare(b.saleDate+b.id)).map(s=>{
-    const item = DATA.items.find(i=>i.id===s.itemId);
+    const item = s.itemId ? DATA.items.find(i=>i.id===s.itemId) : null;
     const st = warrantyStatus(s.warrantyExpiry);
-    return `<tr><td>${esc(s.serial)}</td><td>${esc(item?item.name:'(ลบแล้ว)')}</td><td>${esc(s.customer||'-')}</td><td>${esc(s.province||'-')}</td><td>${fmtDate(s.saleDate)}</td><td>${s.warrantyYears} ปี</td><td>${fmtDate(s.warrantyExpiry)}</td><td>${st.label}</td></tr>`;
+    return `<tr><td>${esc(s.serial)}</td><td>${esc(item?item.name:(s.itemName||'-'))}</td><td>${esc(s.customer||'-')}</td><td>${esc(s.province||'-')}</td><td>${fmtDate(s.saleDate)}</td><td>${s.warrantyYears} ปี</td><td>${fmtDate(s.warrantyExpiry)}</td><td>${st.label}</td></tr>`;
   }).join('');
   document.getElementById('printReport').innerHTML = `
     <h1>รายงานข้อมูลสต็อกสินค้า</h1>
@@ -664,8 +677,9 @@ function dashboardHTML(){
   }else{
     html += `<table><thead><tr><th>Serial No.</th><th>สินค้า</th><th>หมดประกัน</th></tr></thead><tbody>`;
     soonList.forEach(s=>{
-      const item = DATA.items.find(i=>i.id===s.itemId);
-      html += `<tr><td class="mono">${esc(s.serial)}</td><td>${esc(item?item.name:'(ลบแล้ว)')}</td><td class="mono">${fmtDate(s.warrantyExpiry)}</td></tr>`;
+      const item = s.itemId ? DATA.items.find(i=>i.id===s.itemId) : null;
+      const name = item ? item.name : (s.itemName || '-');
+      html += `<tr><td class="mono">${esc(s.serial)}</td><td>${esc(name)}</td><td class="mono">${fmtDate(s.warrantyExpiry)}</td></tr>`;
     });
     html += `</tbody></table>`;
   }
@@ -776,7 +790,7 @@ function warrantyHTML(){
   if(unlocked){
     html += `<div class="card" style="margin-bottom:16px;">
       <div class="section-head"><h2>นำเข้าประวัติเก่า (CSV)</h2></div>
-      <div class="note">อัปโหลดไฟล์ CSV ที่มีหัวตารางในบรรทัดแรก ต้องมีคอลัมน์อย่างน้อย <b>serial, item_name, sale_date</b> และแนะนำให้ใส่ <b>brand</b> (Hoymiles/Huawei), <b>warranty_years</b> (1-15), <b>customer_name</b>, <b>note</b> ด้วย — วันที่ต้องเป็นรูปแบบ YYYY-MM-DD เช่น 2024-01-15<br>ถ้าชื่อสินค้าในไฟล์ยังไม่มีในระบบ จะสร้างสินค้าใหม่ให้อัตโนมัติ (จำนวนคงเหลือเริ่มต้นที่ 0 ให้ไปแก้จำนวนเองภายหลัง)</div>
+      <div class="note">อัปโหลดไฟล์ CSV ที่มีหัวตารางในบรรทัดแรก ต้องมีคอลัมน์อย่างน้อย <b>serial, item_name, sale_date</b> และแนะนำให้ใส่ <b>brand</b> (Hoymiles/Huawei), <b>warranty_years</b> (1-15), <b>customer_name</b>, <b>note</b> ด้วย — วันที่ต้องเป็นรูปแบบ YYYY-MM-DD เช่น 2024-01-15<br><b>ข้อมูลที่นำเข้าจะเป็นแค่ประวัติ Serial/ประกันเก็บไว้ดูเท่านั้น จะไม่ไปเพิ่มหรือแก้ไขรายการสินค้าในสต็อกให้เด็ดขาด</b> ถ้าชื่อสินค้าในไฟล์ตรงกับที่มีอยู่ในสต็อกอยู่แล้วเป๊ะๆ ระบบจะลิงก์ไว้ให้เฉยๆ เพื่อให้กรองตามแบรนด์ได้สะดวกขึ้น (ถ้าไม่ตรงหรือไม่ระบุ brand จะถือเป็น Hoymiles โดยอัตโนมัติ)</div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
         <button class="ghost small" onclick="downloadCsvTemplate()">ดาวน์โหลดเทมเพลต CSV</button>
         <button class="primary small" onclick="document.getElementById('importCsvFile').click()">เลือกไฟล์ CSV เพื่อนำเข้า</button>
@@ -802,10 +816,15 @@ function attachWarrantyFilters(){
     const group = gSel.value;
     const status = stSel.value;
     let rows = [...DATA.serials].sort((a,b)=> (b.saleDate+b.id).localeCompare(a.saleDate+a.id));
-    rows = rows.map(s=>({...s, item: DATA.items.find(i=>i.id===s.itemId)}));
-    if(group!=='all') rows = rows.filter(r=> r.item && (r.item.category||'Hoymiles')===group);
+    rows = rows.map(s=>{
+      const item = s.itemId ? DATA.items.find(i=>i.id===s.itemId) : null;
+      const displayName = item ? item.name : (s.itemName || '-');
+      const displayBrand = item ? (item.category||'Hoymiles') : (s.brand || 'Hoymiles');
+      return {...s, item, displayName, displayBrand};
+    });
+    if(group!=='all') rows = rows.filter(r=> r.displayBrand===group);
     if(status!=='all') rows = rows.filter(r=> warrantyStatus(r.warrantyExpiry).cls===status);
-    if(q) rows = rows.filter(r=> r.serial.toLowerCase().includes(q) || (r.item && r.item.name.toLowerCase().includes(q)) || (r.customer && r.customer.toLowerCase().includes(q)));
+    if(q) rows = rows.filter(r=> r.serial.toLowerCase().includes(q) || r.displayName.toLowerCase().includes(q) || (r.customer && r.customer.toLowerCase().includes(q)));
     const host = document.getElementById('warrantyTableHost');
     if(rows.length===0){ host.innerHTML = `<div class="empty"><div class="big">ไม่พบข้อมูล</div>ลองค้นหาหรือเปลี่ยนตัวกรองด้านบน</div>`; return; }
     let html = `<table><thead><tr><th>Serial No.</th><th>สินค้า</th><th>ลูกค้า</th><th>จังหวัด</th><th>แบรนด์</th><th>วันที่ขาย</th><th>ระยะประกัน</th><th>หมดประกัน</th><th>สถานะ</th><th></th></tr></thead><tbody>`;
@@ -813,10 +832,10 @@ function attachWarrantyFilters(){
       const st = warrantyStatus(r.warrantyExpiry);
       html += `<tr>
         <td class="mono">${esc(r.serial)}</td>
-        <td>${esc(r.item?r.item.name:'(ลบแล้ว)')}</td>
+        <td>${esc(r.displayName)}${!r.item?' <span class="badge grp" style="margin-left:4px;">ประวัติเท่านั้น</span>':''}</td>
         <td>${esc(r.customer||'-')}</td>
         <td>${esc(r.province||'-')}</td>
-        <td><span class="badge grp">${esc(r.item?(r.item.category||'Hoymiles'):'-')}</span></td>
+        <td><span class="badge grp">${esc(r.displayBrand)}</span></td>
         <td class="mono">${fmtDate(r.saleDate)}</td>
         <td class="mono">${r.warrantyYears} ปี</td>
         <td class="mono">${fmtDate(r.warrantyExpiry)}</td>
@@ -840,8 +859,11 @@ function openSerialModal(id){
   if(!rec) return;
   document.getElementById('serialEditId').value = id;
   const itemSel = document.getElementById('serialItem');
-  itemSel.innerHTML = DATA.items.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('');
-  itemSel.value = rec.itemId;
+  itemSel.innerHTML = '<option value="">- ไม่ผูกกับสินค้าในสต็อก (ประวัติเก่าเท่านั้น) -</option>' + DATA.items.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('');
+  itemSel.value = rec.itemId || '';
+  document.getElementById('serialFreeName').value = rec.itemName || '';
+  document.getElementById('serialFreeBrand').value = rec.brand || 'Hoymiles';
+  toggleSerialFreeName();
   document.getElementById('serialNumber').value = rec.serial;
   document.getElementById('serialSaleDate').value = rec.saleDate;
   const wy = document.getElementById('serialWarrantyYears');
@@ -856,6 +878,10 @@ function openSerialModal(id){
   document.getElementById('serialNote').value = rec.note || '';
   document.getElementById('serialModalWrap').classList.add('open');
 }
+function toggleSerialFreeName(){
+  const isLinked = document.getElementById('serialItem').value !== '';
+  document.getElementById('serialFreeNameWrap').style.display = isLinked ? 'none' : 'block';
+}
 function closeSerialModal(){ document.getElementById('serialModalWrap').classList.remove('open'); }
 async function saveSerialEdit(){
   const id = document.getElementById('serialEditId').value;
@@ -864,6 +890,9 @@ async function saveSerialEdit(){
   const serial = document.getElementById('serialNumber').value.trim();
   if(!serial){ showToast('กรุณากรอกเลข Serial Number'); return; }
   const itemId = document.getElementById('serialItem').value;
+  const freeName = document.getElementById('serialFreeName').value.trim();
+  const freeBrand = document.getElementById('serialFreeBrand').value;
+  if(!itemId && !freeName){ showToast('กรุณาเลือกสินค้าในสต็อก หรือพิมพ์ชื่อสินค้าเอง'); return; }
   const saleDate = document.getElementById('serialSaleDate').value || rec.saleDate;
   const warrantyYears = Number(document.getElementById('serialWarrantyYears').value) || 1;
   const customer = document.getElementById('serialCustomer').value.trim();
@@ -872,7 +901,9 @@ async function saveSerialEdit(){
   const dup = DATA.serials.find(s=> s.id!==id && s.serial.toLowerCase()===serial.toLowerCase());
   if(dup){ showToast('เลข Serial นี้ถูกใช้กับรายการอื่นอยู่แล้ว'); return; }
   rec.serial = serial;
-  rec.itemId = itemId;
+  rec.itemId = itemId || null;
+  rec.itemName = itemId ? null : freeName;
+  rec.brand = itemId ? null : freeBrand;
   rec.saleDate = saleDate;
   rec.warrantyYears = warrantyYears;
   rec.warrantyExpiry = addYears(saleDate, warrantyYears);
@@ -944,7 +975,7 @@ async function handleImportSerials(evt){
       alert('ไฟล์ CSV ต้องมีคอลัมน์อย่างน้อย serial, item_name, sale_date (ดูตัวอย่างจากปุ่ม "ดาวน์โหลดเทมเพลต CSV")');
       fileInput.value=''; return;
     }
-    let added=0, skippedDup=0, skippedInvalid=0, createdItems=0;
+    let added=0, skippedDup=0, skippedInvalid=0, matchedItems=0;
     const existingSerials = new Set(DATA.serials.map(s=>s.serial.toLowerCase()));
     rows.forEach(row=>{
       const serial = (row.serial||'').trim();
@@ -958,22 +989,25 @@ async function handleImportSerials(evt){
       const province = (row.province||'').trim();
       if(!serial || !itemName || !/^\d{4}-\d{2}-\d{2}$/.test(saleDate)){ skippedInvalid++; return; }
       if(existingSerials.has(serial.toLowerCase())){ skippedDup++; return; }
-      if(!GROUPS.includes(brand)) brand = 'Hoymiles';
-      let item = DATA.items.find(i=> i.name.trim().toLowerCase()===itemName.toLowerCase());
-      if(!item){
-        item = {id:uid(), name:itemName, sku:'', unit:'ชิ้น', qty:0, minStock:5, category:brand};
-        DATA.items.push(item);
-        createdItems++;
-      }
+      if(!GROUPS.includes(brand)) brand = '';
+      // ไม่สร้างสินค้าใหม่ในสต็อก — ถ้าชื่อตรงกับสินค้าที่มีอยู่แล้วเป๊ะๆ จะลิงก์ไว้เฉยๆ เพื่อความสะดวก แต่ถ้าไม่ตรงก็แค่เก็บชื่อไว้ในประวัติ ไม่ยุ่งกับรายการสต็อก
+      const matchedItem = DATA.items.find(i=> i.name.trim().toLowerCase()===itemName.toLowerCase());
+      if(matchedItem) matchedItems++;
       const expiry = addYears(saleDate, years);
-      DATA.serials.push({id:uid(), serial, itemId:item.id, txId:null, saleDate, warrantyYears:years, warrantyExpiry:expiry, note, customer, province});
+      DATA.serials.push({
+        id:uid(), serial,
+        itemId: matchedItem ? matchedItem.id : null,
+        itemName: itemName,
+        brand: brand || (matchedItem ? (matchedItem.category||'Hoymiles') : 'Hoymiles'),
+        txId:null, saleDate, warrantyYears:years, warrantyExpiry:expiry, note, customer, province
+      });
       existingSerials.add(serial.toLowerCase());
       added++;
     });
     await persist();
     render();
-    let msg = `นำเข้าสำเร็จ ${added} รายการ`;
-    if(createdItems) msg += `\nสร้างสินค้าใหม่ ${createdItems} รายการ (จำนวนคงเหลือเริ่มต้นที่ 0 อย่าลืมไปแก้จำนวนจริง)`;
+    let msg = `นำเข้าสำเร็จ ${added} รายการ (เป็นประวัติเก็บไว้เฉยๆ ไม่ได้เพิ่มลงรายการสต็อกสินค้า)`;
+    if(matchedItems) msg += `\nในจำนวนนี้ ${matchedItems} รายการ ชื่อสินค้าตรงกับที่มีในสต็อกอยู่แล้ว จึงลิงก์ไว้ให้อัตโนมัติ`;
     if(skippedDup) msg += `\nข้าม (Serial ซ้ำ) ${skippedDup} รายการ`;
     if(skippedInvalid) msg += `\nข้าม (ข้อมูลไม่ครบ/วันที่ผิดรูปแบบ) ${skippedInvalid} รายการ`;
     alert(msg);
@@ -1318,7 +1352,7 @@ async function saveTx(){
 Object.assign(window, {
   switchTab, openItemModal, closeItemModal, saveItem, deleteItem,
   openTxModal, closeTxModal, setTxType, saveTx,
-  openSerialModal, closeSerialModal, saveSerialEdit, deleteSerial,
+  openSerialModal, closeSerialModal, saveSerialEdit, deleteSerial, toggleSerialFreeName,
   toggleUnlock, handleImageSelect, removePendingImage,
   exportBackup, handleImportBackup, exportExcel, exportPDF,
   downloadCsvTemplate, handleImportSerials, copyReport
