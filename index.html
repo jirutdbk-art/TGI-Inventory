@@ -574,7 +574,7 @@ function exportExcel(){
       'ประเภท': t.type==='in'?'รับเข้า':'จ่ายออก', 'จำนวน': t.qty, 'หมายเหตุ': t.note||''
     };
   });
-  const serialRows = [...DATA.serials].sort((a,b)=>(a.saleDate+a.id).localeCompare(b.saleDate+b.id)).map(s=>{
+  const serialRows = [...DATA.serials].sort((a,b)=>(b.saleDate+b.id).localeCompare(a.saleDate+a.id)).map(s=>{
     const item = s.itemId ? DATA.items.find(i=>i.id===s.itemId) : null;
     const st = warrantyStatus(s.warrantyExpiry);
     return {
@@ -597,7 +597,7 @@ function exportPDF(){
     const item = DATA.items.find(i=>i.id===t.itemId);
     return `<tr><td>${fmtDate(t.date)}</td><td>${esc(item?item.name:'(ลบแล้ว)')}</td><td>${esc(item?(item.category||'Hoymiles'):'-')}</td><td>${t.type==='in'?'รับเข้า':'จ่ายออก'}</td><td>${t.qty}</td><td>${esc(t.note||'-')}</td></tr>`;
   }).join('');
-  const serialRows = [...DATA.serials].sort((a,b)=>(a.saleDate+a.id).localeCompare(b.saleDate+b.id)).map(s=>{
+  const serialRows = [...DATA.serials].sort((a,b)=>(b.saleDate+b.id).localeCompare(a.saleDate+a.id)).map(s=>{
     const item = s.itemId ? DATA.items.find(i=>i.id===s.itemId) : null;
     const st = warrantyStatus(s.warrantyExpiry);
     return `<tr><td>${esc(s.serial)}</td><td>${esc(item?item.name:(s.itemName||'-'))}</td><td>${esc(s.customer||'-')}</td><td>${esc(s.province||'-')}</td><td>${fmtDate(s.saleDate)}</td><td>${s.warrantyYears} ปี</td><td>${fmtDate(s.warrantyExpiry)}</td><td>${st.label}</td></tr>`;
