@@ -201,6 +201,9 @@ tr:last-child td{border-bottom:none;}
 .field-row .field{flex:1;}
 .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
 .type-toggle{display:flex;gap:8px;margin-bottom:12px;}
+.tx-line{border:1px solid var(--line);border-radius:8px;padding:12px;padding-right:60px;margin-bottom:10px;position:relative;background:var(--paper);}
+.tx-line .tx-line-remove{position:absolute;top:10px;right:10px;}
+.tx-line-num{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
 .type-toggle button{flex:1;padding:10px;border-radius:6px;border:1.5px solid var(--line);background:#fff;font-weight:700;font-family:var(--font-body);cursor:pointer;color:var(--ink-soft);}
 .type-toggle button.sel-in.selected{border-color:var(--stamp-green);background:var(--stamp-green-bg);color:var(--stamp-green);}
 .type-toggle button.sel-out.selected{border-color:var(--stamp-red);background:var(--stamp-red-bg);color:var(--stamp-red);}
@@ -282,36 +285,45 @@ tr:last-child td{border-bottom:none;}
 </div>
 
 <div class="modal-wrap" id="txModalWrap">
-  <div class="modal">
+  <div class="modal" style="max-width:480px;">
     <h3 id="txModalTitle">บันทึกรับเข้า / จ่ายออก</h3>
     <div class="type-toggle">
       <button class="sel-in" id="btnTypeIn" onclick="setTxType('in')">รับเข้า (IN)</button>
       <button class="sel-out" id="btnTypeOut" onclick="setTxType('out')">จ่ายออก (OUT)</button>
     </div>
-    <div class="field">
-      <label>สินค้า</label>
-      <select id="txItem"></select>
-    </div>
-    <div class="field-row">
+
+    <!-- โหมดแก้ไข: สินค้าเดียว ล็อกไม่ให้เปลี่ยนสินค้า/จำนวน -->
+    <div id="txEditSingleWrap" style="display:none;">
+      <div class="field"><label>สินค้า</label><select id="txItem"></select></div>
       <div class="field"><label>จำนวน</label><input id="txQty" type="number" min="1" value="1"></div>
-      <div class="field"><label>วันที่</label><input id="txDate" type="date"></div>
+      <div class="note" id="txEditNote" style="margin-top:-4px;margin-bottom:12px;">แก้ไขได้เฉพาะวันที่ หมายเหตุ และข้อมูลลูกค้า/Serial เท่านั้น — เปลี่ยนสินค้า จำนวน หรือประเภทรายการไม่ได้ (ถ้ากรอกผิดสินค้า/จำนวน ให้ลบรายการเดิมแล้วบันทึกใหม่แทน)</div>
+      <div id="txEditOutFields" style="display:none;">
+        <div class="field">
+          <label>ระยะเวลารับประกัน (นับจากวันที่ขาย)</label>
+          <select id="txWarrantyYears"></select>
+        </div>
+        <div class="field">
+          <label>เลข Serial Number (กรอกทีละบรรทัด ให้ครบตามจำนวนที่ขาย)</label>
+          <textarea id="txSerials" rows="3" class="mono" placeholder="เช่น&#10;HM-2024-0001&#10;HM-2024-0002"></textarea>
+        </div>
+      </div>
     </div>
-    <div class="note" id="txEditNote" style="display:none;margin-top:-4px;margin-bottom:12px;">แก้ไขได้เฉพาะวันที่ หมายเหตุ และข้อมูลลูกค้า/Serial เท่านั้น — เปลี่ยนสินค้า จำนวน หรือประเภทรายการไม่ได้ (ถ้ากรอกผิดสินค้า/จำนวน ให้ลบรายการเดิมแล้วบันทึกใหม่แทน)</div>
-    <div class="field"><label>หมายเหตุ (ไม่บังคับ)</label><input id="txNote" placeholder="เช่น รับจากซัพพลายเออร์ A / เบิกใช้แผนกบัญชี"></div>
-    <div id="txOutSection" style="display:none;">
+
+    <!-- โหมดเพิ่มใหม่: ใส่ได้หลายสินค้าในการบันทึกครั้งเดียว -->
+    <div id="txAddLinesWrap">
+      <div id="txLineList"></div>
+      <button type="button" class="ghost small" onclick="addTxLine()" style="margin-bottom:14px;">+ เพิ่มสินค้าอีกรายการ</button>
+    </div>
+
+    <div class="field"><label>วันที่</label><input id="txDate" type="date"></div>
+    <div id="txSharedOutFields" style="display:none;">
       <div class="field-row">
         <div class="field"><label>ชื่อลูกค้า (ไม่บังคับ)</label><input id="txCustomer" placeholder="เช่น บริษัท เอบีซี จำกัด / คุณสมชาย"></div>
         <div class="field"><label>จังหวัด (ไม่บังคับ)</label><select id="txProvince"><option value="">- ไม่ระบุ -</option></select></div>
       </div>
-      <div class="field">
-        <label>ระยะเวลารับประกัน (นับจากวันที่ขาย)</label>
-        <select id="txWarrantyYears"></select>
-      </div>
-      <div class="field">
-        <label>เลข Serial Number (กรอกทีละบรรทัด ให้ครบตามจำนวนที่ขาย)</label>
-        <textarea id="txSerials" rows="3" class="mono" placeholder="เช่น&#10;HM-2024-0001&#10;HM-2024-0002"></textarea>
-      </div>
     </div>
+    <div class="field"><label>หมายเหตุ (ไม่บังคับ ใช้ร่วมกันทุกรายการในการบันทึกครั้งนี้)</label><input id="txNote" placeholder="เช่น รับจากซัพพลายเออร์ A / คำสั่งซื้อของลูกค้า"></div>
+
     <div class="modal-actions">
       <button class="ghost" onclick="closeTxModal()">ยกเลิก</button>
       <button class="primary" id="txSaveBtn" onclick="saveTx()">บันทึกรายการ</button>
@@ -1212,36 +1224,85 @@ async function deleteItem(id){
 
 
 // Transaction modal
+let txLineCounter = 0;
+
+function txLineItemOptions(){
+  return DATA.items.map(i=>`<option value="${i.id}">${esc(i.name)} (คงเหลือ ${i.qty} ${esc(i.unit)})</option>`).join('');
+}
+function txLineWarrantyOptions(){
+  return Array.from({length:15}, (_,idx)=>idx+1).map(y=>`<option value="${y}" ${y===1?'selected':''}>${y} ปี</option>`).join('');
+}
+function addTxLine(){
+  txLineCounter++;
+  const lineId = 'line'+txLineCounter;
+  const div = document.createElement('div');
+  div.className = 'tx-line';
+  div.dataset.lineId = lineId;
+  div.innerHTML = `
+    <div class="tx-line-num">รายการที่ ${document.querySelectorAll('.tx-line').length+1}</div>
+    <div class="field-row">
+      <div class="field"><label>สินค้า</label><select class="txLineItem">${txLineItemOptions()}</select></div>
+      <div class="field" style="max-width:100px;"><label>จำนวน</label><input class="txLineQty" type="number" min="1" value="1"></div>
+    </div>
+    <div class="txLineOutFields" style="display:${currentTxType==='out'?'block':'none'};">
+      <div class="field"><label>ระยะเวลารับประกัน</label><select class="txLineWarranty">${txLineWarrantyOptions()}</select></div>
+      <div class="field"><label>Serial Number (บรรทัดละ 1 เลข ให้ครบตามจำนวน)</label><textarea class="txLineSerials" rows="2" class="mono" placeholder="เช่น&#10;HM-2024-0001"></textarea></div>
+    </div>
+    <button type="button" class="ghost small danger-outline tx-line-remove" onclick="removeTxLine('${lineId}')">ลบ</button>
+  `;
+  document.getElementById('txLineList').appendChild(div);
+  renumberTxLines();
+}
+function removeTxLine(lineId){
+  const el = document.querySelector(`.tx-line[data-line-id="${lineId}"]`);
+  if(el) el.remove();
+  renumberTxLines();
+}
+function renumberTxLines(){
+  const lines = document.querySelectorAll('.tx-line');
+  lines.forEach((l,idx)=>{
+    l.querySelector('.tx-line-num').textContent = 'รายการที่ ' + (idx+1);
+    const btn = l.querySelector('.tx-line-remove');
+    if(btn) btn.style.display = lines.length>1 ? 'inline-block' : 'none';
+  });
+}
+function clearTxLines(){
+  document.getElementById('txLineList').innerHTML = '';
+  txLineCounter = 0;
+}
+
 function openTxModal(editId){
   if(!unlocked){ showToast('เปิดโหมดแก้ไขก่อนเพื่อบันทึกรายการ'); return; }
   if(DATA.items.length===0){ showToast('กรุณาเพิ่มสินค้าก่อน'); return; }
   editingTxId = editId || null;
-  const sel = document.getElementById('txItem');
-  sel.innerHTML = DATA.items.map(i=>`<option value="${i.id}">${esc(i.name)} (คงเหลือ ${i.qty} ${esc(i.unit)})</option>`).join('');
-  const wy = document.getElementById('txWarrantyYears');
-  wy.innerHTML = Array.from({length:15}, (_,idx)=>idx+1).map(y=>`<option value="${y}">${y} ปี</option>`).join('');
   const provSel = document.getElementById('txProvince');
   if(provSel.options.length<=1){
     provSel.innerHTML = '<option value="">- ไม่ระบุ -</option>' + PROVINCES.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
   }
   document.getElementById('txCustomer').value = '';
   provSel.value = '';
-  document.getElementById('txSerials').value = '';
-  document.getElementById('txEditNote').style.display = 'none';
+  document.getElementById('txNote').value = '';
+  document.getElementById('txDate').value = todayStr();
 
   if(editingTxId){
     const tx = DATA.transactions.find(t=>t.id===editingTxId);
     if(!tx){ editingTxId=null; return; }
+    document.getElementById('txAddLinesWrap').style.display = 'none';
+    document.getElementById('txEditSingleWrap').style.display = 'block';
     document.getElementById('txModalTitle').textContent = 'แก้ไขรายการ';
-    document.getElementById('txItem').value = tx.itemId;
-    document.getElementById('txItem').disabled = true;
+    const sel = document.getElementById('txItem');
+    sel.innerHTML = txLineItemOptions();
+    sel.value = tx.itemId;
+    sel.disabled = true;
     document.getElementById('txQty').value = tx.qty;
     document.getElementById('txQty').disabled = true;
     document.getElementById('txDate').value = tx.date;
     document.getElementById('txNote').value = tx.note || '';
     document.getElementById('btnTypeIn').disabled = true;
     document.getElementById('btnTypeOut').disabled = true;
-    document.getElementById('txEditNote').style.display = 'block';
+    const wy = document.getElementById('txWarrantyYears');
+    wy.innerHTML = txLineWarrantyOptions();
+    document.getElementById('txSerials').value = '';
     setTxType(tx.type);
     if(tx.type==='out'){
       const relatedSerials = DATA.serials.filter(s=>s.txId===tx.id);
@@ -1254,15 +1315,13 @@ function openTxModal(editId){
     }
     document.getElementById('txSaveBtn').textContent = 'บันทึกการแก้ไข';
   }else{
+    document.getElementById('txEditSingleWrap').style.display = 'none';
+    document.getElementById('txAddLinesWrap').style.display = 'block';
     document.getElementById('txModalTitle').textContent = 'บันทึกรับเข้า / จ่ายออก';
-    document.getElementById('txItem').disabled = false;
-    document.getElementById('txQty').disabled = false;
     document.getElementById('btnTypeIn').disabled = false;
     document.getElementById('btnTypeOut').disabled = false;
-    document.getElementById('txQty').value = 1;
-    document.getElementById('txNote').value = '';
-    document.getElementById('txDate').value = todayStr();
-    wy.value = 1;
+    clearTxLines();
+    addTxLine();
     setTxType('in');
     document.getElementById('txSaveBtn').textContent = 'บันทึกรายการ';
   }
@@ -1276,18 +1335,21 @@ function setTxType(t){
   currentTxType = t;
   document.getElementById('btnTypeIn').classList.toggle('selected', t==='in');
   document.getElementById('btnTypeOut').classList.toggle('selected', t==='out');
-  document.getElementById('txOutSection').style.display = t==='out' ? 'block' : 'none';
+  document.querySelectorAll('.txLineOutFields').forEach(el=>{ el.style.display = t==='out' ? 'block' : 'none'; });
+  document.getElementById('txSharedOutFields').style.display = t==='out' ? 'block' : 'none';
+  const editOutFields = document.getElementById('txEditOutFields');
+  if(editOutFields) editOutFields.style.display = (t==='out' && editingTxId) ? 'block' : 'none';
 }
 async function saveTx(){
-  const itemId = document.getElementById('txItem').value;
-  const qty = Number(document.getElementById('txQty').value);
   const date = document.getElementById('txDate').value || todayStr();
-  const note = document.getElementById('txNote').value.trim();
-  if(!qty || qty<=0){ showToast('กรุณากรอกจำนวนให้ถูกต้อง'); return; }
-  const item = DATA.items.find(i=>i.id===itemId);
-  if(!item) return;
+  const sharedNote = document.getElementById('txNote').value.trim();
 
   if(editingTxId){
+    const itemId = document.getElementById('txItem').value;
+    const qty = Number(document.getElementById('txQty').value);
+    if(!qty || qty<=0){ showToast('กรุณากรอกจำนวนให้ถูกต้อง'); return; }
+    const item = DATA.items.find(i=>i.id===itemId);
+    if(!item) return;
     const tx = DATA.transactions.find(t=>t.id===editingTxId);
     if(!tx){ closeTxModal(); return; }
     let serials = [];
@@ -1308,12 +1370,12 @@ async function saveTx(){
       }
     }
     tx.date = date;
-    tx.note = note;
+    tx.note = sharedNote;
     if(tx.type==='out'){
       DATA.serials = DATA.serials.filter(s=>s.txId!==tx.id);
       const expiry = addYears(date, warrantyYears);
       serials.forEach(sn=>{
-        DATA.serials.push({id:uid(), serial:sn, itemId:tx.itemId, txId:tx.id, saleDate:date, warrantyYears, warrantyExpiry:expiry, note, customer, province});
+        DATA.serials.push({id:uid(), serial:sn, itemId:tx.itemId, txId:tx.id, saleDate:date, warrantyYears, warrantyExpiry:expiry, note:sharedNote, customer, province});
       });
     }
     await persist();
@@ -1323,44 +1385,74 @@ async function saveTx(){
     return;
   }
 
-  if(currentTxType==='out' && qty > item.qty){
-    if(!confirm('จำนวนที่จ่ายออกมากกว่าที่มีในสต็อก (' + item.qty + ' ' + item.unit + ') ต้องการดำเนินการต่อหรือไม่?')) return;
-  }
-  let serials = [];
-  let warrantyYears = null;
-  let customer = '', province = '';
-  if(currentTxType==='out'){
-    customer = document.getElementById('txCustomer').value.trim();
-    province = document.getElementById('txProvince').value;
-    warrantyYears = Number(document.getElementById('txWarrantyYears').value) || 1;
-    const raw = document.getElementById('txSerials').value;
-    serials = raw.split(/[\n,]/).map(s=>s.trim()).filter(Boolean);
-    if(serials.length>0 && serials.length!==qty){
-      showToast('จำนวน Serial Number (' + serials.length + ') ไม่ตรงกับจำนวนที่ขาย (' + qty + ')');
-      return;
+  // ---- โหมดเพิ่มใหม่: รองรับหลายสินค้าในการบันทึกครั้งเดียว ----
+  const lineEls = Array.from(document.querySelectorAll('.tx-line'));
+  if(lineEls.length===0){ showToast('กรุณาเพิ่มอย่างน้อย 1 รายการสินค้า'); return; }
+  const customer = document.getElementById('txCustomer').value.trim();
+  const province = document.getElementById('txProvince').value;
+
+  // ตรวจสอบทุกบรรทัดให้ผ่านหมดก่อน ค่อยบันทึกจริง กันข้อมูลครึ่งๆ กลางๆ ถ้ามีบรรทัดใดผิดพลาด
+  const parsedLines = [];
+  for(const lineEl of lineEls){
+    const itemId = lineEl.querySelector('.txLineItem').value;
+    const qty = Number(lineEl.querySelector('.txLineQty').value);
+    const item = DATA.items.find(i=>i.id===itemId);
+    if(!item){ showToast('พบรายการสินค้าที่ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง'); return; }
+    if(!qty || qty<=0){ showToast('กรุณากรอกจำนวนให้ถูกต้องทุกรายการ (' + item.name + ')'); return; }
+    let serials = [];
+    let warrantyYears = null;
+    if(currentTxType==='out'){
+      if(qty > item.qty){
+        if(!confirm('จำนวนที่จ่ายออกของ "' + item.name + '" มากกว่าที่มีในสต็อก (' + item.qty + ' ' + item.unit + ') ต้องการดำเนินการต่อหรือไม่?')) return;
+      }
+      warrantyYears = Number(lineEl.querySelector('.txLineWarranty').value) || 1;
+      const raw = lineEl.querySelector('.txLineSerials').value;
+      serials = raw.split(/[\n,]/).map(s=>s.trim()).filter(Boolean);
+      if(serials.length>0 && serials.length!==qty){
+        showToast('จำนวน Serial Number ของ "' + item.name + '" (' + serials.length + ') ไม่ตรงกับจำนวนที่ขาย (' + qty + ')');
+        return;
+      }
+      if(serials.length===0){
+        if(!confirm('รายการ "' + item.name + '" ยังไม่ได้กรอก Serial Number จะไม่สามารถติดตามการรับประกันได้ ต้องการบันทึกต่อโดยไม่ระบุ Serial หรือไม่?')) return;
+      }
     }
-    if(serials.length===0){
-      if(!confirm('ยังไม่ได้กรอก Serial Number จะไม่สามารถติดตามการรับประกันของสินค้าล็อตนี้ได้ ต้องการบันทึกต่อโดยไม่ระบุ Serial หรือไม่?')) return;
+    parsedLines.push({item, qty, serials, warrantyYears});
+  }
+
+  // เช็ค Serial ซ้ำกันเองภายในชุดที่กำลังบันทึก และซ้ำกับที่มีอยู่แล้วในระบบ
+  const allSerialsThisBatch = parsedLines.flatMap(l=>l.serials.map(s=>s.toLowerCase()));
+  const seen = new Set();
+  for(const s of allSerialsThisBatch){
+    if(seen.has(s)){ showToast('มีเลข Serial "' + s + '" ซ้ำกันเองภายในรายการที่กำลังบันทึก กรุณาตรวจสอบ'); return; }
+    seen.add(s);
+  }
+  const existingSerials = new Set(DATA.serials.map(s=>s.serial.toLowerCase()));
+  for(const s of allSerialsThisBatch){
+    if(existingSerials.has(s)){ showToast('เลข Serial "' + s + '" มีอยู่ในระบบแล้ว กรุณาตรวจสอบ'); return; }
+  }
+
+  const batchId = uid();
+  parsedLines.forEach(({item, qty, serials, warrantyYears})=>{
+    const txId = uid();
+    item.qty += currentTxType==='in' ? qty : -qty;
+    DATA.transactions.push({id:txId, itemId:item.id, type:currentTxType, qty, date, note:sharedNote, batchId});
+    if(currentTxType==='out' && serials.length>0){
+      const expiry = addYears(date, warrantyYears);
+      serials.forEach(sn=>{
+        DATA.serials.push({id:uid(), serial:sn, itemId:item.id, txId, saleDate:date, warrantyYears, warrantyExpiry:expiry, note:sharedNote, customer, province});
+      });
     }
-  }
-  const txId = uid();
-  item.qty += currentTxType==='in' ? qty : -qty;
-  DATA.transactions.push({id:txId, itemId, type:currentTxType, qty, date, note});
-  if(currentTxType==='out' && serials.length>0){
-    const expiry = addYears(date, warrantyYears);
-    serials.forEach(sn=>{
-      DATA.serials.push({id:uid(), serial:sn, itemId, txId, saleDate:date, warrantyYears, warrantyExpiry:expiry, note, customer, province});
-    });
-  }
+  });
   await persist();
   closeTxModal();
   render();
-  showToast(currentTxType==='in' ? 'บันทึกรับเข้าแล้ว' : 'บันทึกจ่ายออกแล้ว');
+  const n = parsedLines.length;
+  showToast(currentTxType==='in' ? `บันทึกรับเข้าแล้ว ${n} รายการสินค้า` : `บันทึกจ่ายออกแล้ว ${n} รายการสินค้า`);
 }
 
 Object.assign(window, {
   switchTab, openItemModal, closeItemModal, saveItem, deleteItem,
-  openTxModal, closeTxModal, setTxType, saveTx,
+  openTxModal, closeTxModal, setTxType, saveTx, addTxLine, removeTxLine,
   openSerialModal, closeSerialModal, saveSerialEdit, deleteSerial, toggleSerialFreeName,
   toggleUnlock, handleImageSelect, removePendingImage,
   exportBackup, handleImportBackup, exportExcel, exportPDF,
