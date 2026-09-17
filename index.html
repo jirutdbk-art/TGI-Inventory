@@ -630,21 +630,25 @@ function exportPDF(){
 function exportStockSummaryPDF(){
   const totalItems = DATA.items.length;
   const totalValue = stockValue(DATA.items);
-  const brandRows = GROUPS.map(g=>{
+  const brandSections = GROUPS.map(g=>{
     const gItems = DATA.items.filter(i=>(i.category||'Hoymiles')===g);
-    return `<tr><td>${g}</td><td>${gItems.length} รายการ</td><td>${fmtBaht(stockValue(gItems))}</td></tr>`;
+    const rows = gItems.map((i,idx)=>`<tr><td>${idx+1}</td><td>${esc(i.name)}</td><td>${esc(i.sku||'-')}</td><td>${i.qty} ${esc(i.unit)}</td><td>${fmtBaht(i.qty*(i.cost||0))}</td></tr>`).join('');
+    return `
+      <h2>${g} (${gItems.length} รายการ) — รวม ${fmtBaht(stockValue(gItems))}</h2>
+      <table><thead><tr><th>#</th><th>สินค้า</th><th>SKU</th><th>คงเหลือ</th><th>มูลค่า</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5">ไม่มีสินค้าในกลุ่มนี้</td></tr>'}</tbody></table>
+    `;
   }).join('');
   document.getElementById('printReport').innerHTML = `
     <h1>สรุปสต็อกสินค้า</h1>
     <div style="font-size:12px;color:#666;margin-bottom:16px;">Trinity Global Innovation Co., Ltd. — ข้อมูล ณ วันที่ ${fmtDate(todayStr())}</div>
-    <table style="max-width:420px;">
+    <table style="max-width:420px;margin-bottom:8px;">
       <tbody>
         <tr><td style="font-weight:600;">จำนวนรายการสินค้าทั้งหมด</td><td>${totalItems} รายการ</td></tr>
         <tr><td style="font-weight:600;">มูลค่าสต็อกรวม (ต้นทุน)</td><td>${fmtBaht(totalValue)}</td></tr>
       </tbody>
     </table>
-    <h2>แยกตามแบรนด์</h2>
-    <table style="max-width:420px;"><thead><tr><th>แบรนด์</th><th>จำนวนรายการ</th><th>มูลค่าสต็อก</th></tr></thead><tbody>${brandRows}</tbody></table>
+    ${brandSections}
   `;
   setTimeout(()=>{ window.print(); }, 80);
 }
