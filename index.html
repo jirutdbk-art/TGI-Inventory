@@ -604,7 +604,12 @@ function exportExcel(){
 }
 
 function exportPDF(){
-  const itemsRows = DATA.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${esc(i.sku||'-')}</td><td>${esc(i.category||'Hoymiles')}</td><td>${i.qty} ${esc(i.unit)}</td><td>${i.minStock}</td><td>${fmtBaht(i.cost||0)}</td><td>${fmtBaht(i.qty*(i.cost||0))}</td></tr>`).join('');
+  const itemsRows = DATA.items.map(i=>{
+    const thumb = i.image
+      ? `<img src="${i.image}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid #999;display:block;">`
+      : `<div style="width:36px;height:36px;border-radius:4px;border:1px dashed #bbb;"></div>`;
+    return `<tr><td>${thumb}</td><td>${esc(i.name)}</td><td>${esc(i.sku||'-')}</td><td>${esc(i.category||'Hoymiles')}</td><td>${i.qty} ${esc(i.unit)}</td><td>${i.minStock}</td><td>${fmtBaht(i.cost||0)}</td><td>${fmtBaht(i.qty*(i.cost||0))}</td></tr>`;
+  }).join('');
   const txRows = [...DATA.transactions].sort((a,b)=>(a.date+a.id).localeCompare(b.date+b.id)).map(t=>{
     const item = DATA.items.find(i=>i.id===t.itemId);
     return `<tr><td>${fmtDate(t.date)}</td><td>${esc(item?item.name:'(ลบแล้ว)')}</td><td>${esc(item?(item.category||'Hoymiles'):'-')}</td><td>${t.type==='in'?'รับเข้า':'จ่ายออก'}</td><td>${t.qty}</td><td>${esc(t.note||'-')}</td></tr>`;
@@ -615,10 +620,13 @@ function exportPDF(){
     return `<tr><td>${esc(s.serial)}</td><td>${esc(item?item.name:(s.itemName||'-'))}</td><td>${esc(s.customer||'-')}</td><td>${esc(s.province||'-')}</td><td>${fmtDate(s.saleDate)}</td><td>${s.warrantyYears} ปี</td><td>${fmtDate(s.warrantyExpiry)}</td><td>${st.label}</td></tr>`;
   }).join('');
   document.getElementById('printReport').innerHTML = `
-    <h1>รายงานข้อมูลสต็อกสินค้า</h1>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
+      <img src="${LOGO_DATA_URI}" alt="Trinity Global Innovation" style="height:48px;width:auto;">
+      <h1 style="margin:0;">รายงานข้อมูลสต็อกสินค้า</h1>
+    </div>
     <div style="font-size:12px;color:#666;margin-bottom:8px;">Trinity Global Innovation Co., Ltd. — ข้อมูล ณ วันที่ ${fmtDate(todayStr())}</div>
     <h2>รายการสินค้า (${DATA.items.length} รายการ)</h2>
-    <table><thead><tr><th>สินค้า</th><th>SKU</th><th>แบรนด์</th><th>คงเหลือ</th><th>ขั้นต่ำ</th><th>ต้นทุน/หน่วย</th><th>มูลค่าสต็อก</th></tr></thead><tbody>${itemsRows || '<tr><td colspan="7">ไม่มีข้อมูล</td></tr>'}</tbody></table>
+    <table><thead><tr><th>รูป</th><th>สินค้า</th><th>SKU</th><th>แบรนด์</th><th>คงเหลือ</th><th>ขั้นต่ำ</th><th>ต้นทุน/หน่วย</th><th>มูลค่าสต็อก</th></tr></thead><tbody>${itemsRows || '<tr><td colspan="8">ไม่มีข้อมูล</td></tr>'}</tbody></table>
     <h2>ประวัติรับเข้า-จ่ายออก (${DATA.transactions.length} รายการ)</h2>
     <table><thead><tr><th>วันที่</th><th>สินค้า</th><th>แบรนด์</th><th>ประเภท</th><th>จำนวน</th><th>หมายเหตุ</th></tr></thead><tbody>${txRows || '<tr><td colspan="6">ไม่มีข้อมูล</td></tr>'}</tbody></table>
     <h2>ข้อมูล Serial / ประกันสินค้า (${DATA.serials.length} รายการ)</h2>
@@ -632,15 +640,23 @@ function exportStockSummaryPDF(){
   const totalValue = stockValue(DATA.items);
   const brandSections = GROUPS.map(g=>{
     const gItems = DATA.items.filter(i=>(i.category||'Hoymiles')===g);
-    const rows = gItems.map((i,idx)=>`<tr><td>${idx+1}</td><td>${esc(i.name)}</td><td>${esc(i.sku||'-')}</td><td>${i.qty} ${esc(i.unit)}</td><td>${fmtBaht(i.qty*(i.cost||0))}</td></tr>`).join('');
+    const rows = gItems.map((i,idx)=>{
+      const thumb = i.image
+        ? `<img src="${i.image}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #999;display:block;">`
+        : `<div style="width:40px;height:40px;border-radius:4px;border:1px dashed #bbb;"></div>`;
+      return `<tr><td>${idx+1}</td><td>${thumb}</td><td>${esc(i.name)}</td><td>${esc(i.sku||'-')}</td><td>${i.qty} ${esc(i.unit)}</td><td>${fmtBaht(i.qty*(i.cost||0))}</td></tr>`;
+    }).join('');
     return `
       <h2>${g} (${gItems.length} รายการ) — รวม ${fmtBaht(stockValue(gItems))}</h2>
-      <table><thead><tr><th>#</th><th>สินค้า</th><th>SKU</th><th>คงเหลือ</th><th>มูลค่า</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="5">ไม่มีสินค้าในกลุ่มนี้</td></tr>'}</tbody></table>
+      <table><thead><tr><th>#</th><th>รูป</th><th>สินค้า</th><th>SKU</th><th>คงเหลือ</th><th>มูลค่า</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6">ไม่มีสินค้าในกลุ่มนี้</td></tr>'}</tbody></table>
     `;
   }).join('');
   document.getElementById('printReport').innerHTML = `
-    <h1>สรุปสต็อกสินค้า</h1>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
+      <img src="${LOGO_DATA_URI}" alt="Trinity Global Innovation" style="height:48px;width:auto;">
+      <h1 style="margin:0;">สรุปสต็อกสินค้า</h1>
+    </div>
     <div style="font-size:12px;color:#666;margin-bottom:16px;">Trinity Global Innovation Co., Ltd. — ข้อมูล ณ วันที่ ${fmtDate(todayStr())}</div>
     <table style="max-width:420px;margin-bottom:8px;">
       <tbody>
