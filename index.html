@@ -627,6 +627,28 @@ function exportPDF(){
   setTimeout(()=>{ window.print(); }, 80);
 }
 
+function exportStockSummaryPDF(){
+  const totalItems = DATA.items.length;
+  const totalValue = stockValue(DATA.items);
+  const brandRows = GROUPS.map(g=>{
+    const gItems = DATA.items.filter(i=>(i.category||'Hoymiles')===g);
+    return `<tr><td>${g}</td><td>${gItems.length} รายการ</td><td>${fmtBaht(stockValue(gItems))}</td></tr>`;
+  }).join('');
+  document.getElementById('printReport').innerHTML = `
+    <h1>สรุปสต็อกสินค้า</h1>
+    <div style="font-size:12px;color:#666;margin-bottom:16px;">Trinity Global Innovation Co., Ltd. — ข้อมูล ณ วันที่ ${fmtDate(todayStr())}</div>
+    <table style="max-width:420px;">
+      <tbody>
+        <tr><td style="font-weight:600;">จำนวนรายการสินค้าทั้งหมด</td><td>${totalItems} รายการ</td></tr>
+        <tr><td style="font-weight:600;">มูลค่าสต็อกรวม (ต้นทุน)</td><td>${fmtBaht(totalValue)}</td></tr>
+      </tbody>
+    </table>
+    <h2>แยกตามแบรนด์</h2>
+    <table style="max-width:420px;"><thead><tr><th>แบรนด์</th><th>จำนวนรายการ</th><th>มูลค่าสต็อก</th></tr></thead><tbody>${brandRows}</tbody></table>
+  `;
+  setTimeout(()=>{ window.print(); }, 80);
+}
+
 function dashboardHTML(){
   const low = lowStockItems();
   const week = txInRange(7);
@@ -646,7 +668,8 @@ function dashboardHTML(){
     <div class="note">ส่งออกข้อมูลปัจจุบันทั้งหมดเป็นไฟล์ที่เปิดดูได้นอกแอป — Excel เหมาะกับการเปิดดู/กรอง/คำนวณต่อ ส่วน PDF เหมาะกับการพิมพ์หรือส่งให้คนอื่นดูแบบอ่านอย่างเดียว</div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
       <button class="ghost small" onclick="exportExcel()">ส่งออกเป็น Excel (.xlsx)</button>
-      <button class="ghost small" onclick="exportPDF()">ส่งออกเป็น PDF</button>
+      <button class="ghost small" onclick="exportPDF()">ส่งออกเป็น PDF (ละเอียดทั้งหมด)</button>
+      <button class="ghost small" onclick="exportStockSummaryPDF()">ส่งออกสต็อกเป็น PDF (สรุปย่อ)</button>
     </div>
   </div>`;
   html += `<div class="metrics">
@@ -1455,7 +1478,7 @@ Object.assign(window, {
   openTxModal, closeTxModal, setTxType, saveTx, addTxLine, removeTxLine,
   openSerialModal, closeSerialModal, saveSerialEdit, deleteSerial, toggleSerialFreeName,
   toggleUnlock, handleImageSelect, removePendingImage,
-  exportBackup, handleImportBackup, exportExcel, exportPDF,
+  exportBackup, handleImportBackup, exportExcel, exportPDF, exportStockSummaryPDF,
   downloadCsvTemplate, handleImportSerials, copyReport
 });
 
