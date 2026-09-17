@@ -228,15 +228,17 @@ tr:last-child td{border-bottom:none;}
   .masthead h1{font-size:26px;}
 }
 #printReport{ display:none; }
-#printReport table{ width:100%; border-collapse:collapse; font-size:11px; margin-bottom:22px; }
-#printReport th,#printReport td{ border:1px solid #999; padding:5px 7px; text-align:left; }
+#printReport table{ width:100%; border-collapse:collapse; font-size:9.5px; margin-bottom:10px; }
+#printReport th,#printReport td{ border:1px solid #999; padding:2px 5px; text-align:left; line-height:1.25; }
 #printReport th{ background:#eef5f6; }
-#printReport h1{ font-size:20px; margin:0 0 2px; font-family:var(--font-body); }
-#printReport h2{ font-size:15px; border-bottom:2px solid #132A33; padding-bottom:4px; margin-top:24px; font-family:var(--font-body); font-weight:600; }
+#printReport h1{ font-size:16px; margin:0 0 2px; font-family:var(--font-body); }
+#printReport h2{ font-size:12px; border-bottom:1.5px solid #132A33; padding-bottom:2px; margin:10px 0 4px; font-family:var(--font-body); font-weight:600; }
+#printReport img{ display:block; }
 @media print{
+  @page{ size: A4; margin: 8mm; }
   body *{ visibility:hidden; }
   #printReport, #printReport *{ visibility:visible; }
-  #printReport{ display:block !important; position:absolute; top:0; left:0; width:100%; padding:16px; }
+  #printReport{ display:block !important; position:absolute; top:0; left:0; width:100%; padding:0; font-size:9px; }
 }
 </style>
 </head>
@@ -606,8 +608,8 @@ function exportExcel(){
 function exportPDF(){
   const itemsRows = DATA.items.map(i=>{
     const thumb = i.image
-      ? `<img src="${i.image}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:4px;border:1px solid #999;display:block;">`
-      : `<div style="width:36px;height:36px;border-radius:4px;border:1px dashed #bbb;"></div>`;
+      ? `<img src="${i.image}" alt="" style="width:22px;height:22px;object-fit:cover;border-radius:3px;border:1px solid #999;display:block;">`
+      : `<div style="width:22px;height:22px;border-radius:3px;border:1px dashed #bbb;"></div>`;
     return `<tr><td>${thumb}</td><td>${esc(i.name)}</td><td>${esc(i.sku||'-')}</td><td>${esc(i.category||'Hoymiles')}</td><td>${i.qty} ${esc(i.unit)}</td><td>${i.minStock}</td><td>${fmtBaht(i.cost||0)}</td><td>${fmtBaht(i.qty*(i.cost||0))}</td></tr>`;
   }).join('');
   const txRows = [...DATA.transactions].sort((a,b)=>(a.date+a.id).localeCompare(b.date+b.id)).map(t=>{
@@ -621,7 +623,7 @@ function exportPDF(){
   }).join('');
   document.getElementById('printReport').innerHTML = `
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
-      <img src="${LOGO_DATA_URI}" alt="Trinity Global Innovation" style="height:48px;width:auto;">
+      <img src="${LOGO_DATA_URI}" alt="Trinity Global Innovation" style="height:32px;width:auto;">
       <h1 style="margin:0;">รายงานข้อมูลสต็อกสินค้า</h1>
     </div>
     <div style="font-size:12px;color:#666;margin-bottom:8px;">Trinity Global Innovation Co., Ltd. — ข้อมูล ณ วันที่ ${fmtDate(todayStr())}</div>
@@ -642,8 +644,8 @@ function exportStockSummaryPDF(){
     const gItems = DATA.items.filter(i=>(i.category||'Hoymiles')===g);
     const rows = gItems.map((i,idx)=>{
       const thumb = i.image
-        ? `<img src="${i.image}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #999;display:block;">`
-        : `<div style="width:40px;height:40px;border-radius:4px;border:1px dashed #bbb;"></div>`;
+        ? `<img src="${i.image}" alt="" style="width:22px;height:22px;object-fit:cover;border-radius:3px;border:1px solid #999;display:block;">`
+        : `<div style="width:22px;height:22px;border-radius:3px;border:1px dashed #bbb;"></div>`;
       return `<tr><td>${idx+1}</td><td>${thumb}</td><td>${esc(i.name)}</td><td>${esc(i.sku||'-')}</td><td>${i.qty} ${esc(i.unit)}</td><td>${fmtBaht(i.qty*(i.cost||0))}</td></tr>`;
     }).join('');
     return `
@@ -654,7 +656,7 @@ function exportStockSummaryPDF(){
   }).join('');
   document.getElementById('printReport').innerHTML = `
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
-      <img src="${LOGO_DATA_URI}" alt="Trinity Global Innovation" style="height:48px;width:auto;">
+      <img src="${LOGO_DATA_URI}" alt="Trinity Global Innovation" style="height:32px;width:auto;">
       <h1 style="margin:0;">สรุปสต็อกสินค้า</h1>
     </div>
     <div style="font-size:12px;color:#666;margin-bottom:16px;">Trinity Global Innovation Co., Ltd. — ข้อมูล ณ วันที่ ${fmtDate(todayStr())}</div>
